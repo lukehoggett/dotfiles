@@ -11,11 +11,12 @@ banner="$(hostname)"
 
 # see `ll /usr/share/figlet/*.flf` for list of fonts
 # see `toilet -F` list for list of filters
-toilet -F border -f standard "  $banner  " | lolcat -S 108 -s 0.1 
+toilet -W -f standard "  $banner  " | lolcat -S 0 -s 0.1 
 # toilet -F border -f standard "  $banner  "
 
 # Show Stats
 tput sc # remember cursor position so we can overwrite the following output
+echo ""
 echo "      Gathering System Stats...."
 read cpu_use_total  < <(cat /proc/loadavg | cut -f 3 -d ' ')
 read cpu_core_count < <(grep -c ^processor /proc/cpuinfo)
@@ -29,6 +30,7 @@ cpu_description="${cpu_core_count}x$cpu_speed"
 uptime=$(uptime | cut -f 1 -d ',' | cut -f 2 -d 'p' | xargs)
 # 18:15:13 up  9:33,  1 user,  load average: 1.31, 1.12, 0.77
 tput rc # put the cursor back to where it was
+echo -n " "
 echo -n " "
 echo -n "     $cpu_description CPU $(colour_percentage $cpu_use_total)"
 echo -n "     $mem_available RAM $(colour_percentage $mem_usage)"
