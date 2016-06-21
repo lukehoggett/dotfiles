@@ -29,7 +29,7 @@ alias gm="git merge -Xignore-space-change"
 alias git_no_merged="git branch -a --no-merged"
 
 # Edit
-alias edit="vim"
+alias edit="nano"
 alias e="edit"
 alias ea="edit ~/dotfiles-autoload/aliases.sh && dr"
 alias eg="edit ~/.gitrc"
@@ -38,6 +38,8 @@ alias ev="edit ~/.vimrc"
 alias ed="edit ~/dotfiles/dotfiles.sh"
 
 # Other
-alias i="sudo apt-get install -y"
+alias i="sudo apt install -y"
+alias upd="sudo apt update"
+alias upg="sudo apt upgrade"
 alias locate="sudo updatedb; locate"
 alias explorer="nautilus"
