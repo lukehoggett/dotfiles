@@ -15,6 +15,7 @@ alias vr="vagrant reload"
 
 # Git
 alias g="git"
+alias gch="git checkout"
 alias gp="git pull --no-edit --all --tags && git push && git push --tags"
 alias gs="git status"
 alias gd="git diff"
