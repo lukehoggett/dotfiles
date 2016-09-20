@@ -1,0 +1,32 @@
+{
+	"bootstrapped": true,
+	"in_process_packages":
+	[
+	],
+	"installed_packages":
+	[
+		"Alignment",
+		"All Autocomplete",
+		"Case Conversion",
+		"DocBlockr",
+		"Dockerfile Syntax Highlighting",
+		"Function Name Display",
+		"GitGutter",
+		"Google Search",
+		"HTML-CSS-JS Prettify",
+		"Insert Nums",
+		"LineEndings",
+		"MarkdownEditing",
+		"MySQL Snippets",
+		"nginx",
+		"Package Control",
+		"SideBarEnhancements",
+		"SublimeLinter",
+		"SublimeLinter-jshint",
+		"SublimeLinter-php",
+		"SublimeLinter-shellcheck",
+		"Table Editor",
+		"Theme - itg.flat",
+		"Tmux"
+	]
+}

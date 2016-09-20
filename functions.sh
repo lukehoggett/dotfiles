@@ -2,6 +2,9 @@
 # functions.sh
 # misc functions to help with your workstation.
 
+# execute a command and display stderr in red
+color()(set -o pipefail;"$@" 2>&1>&3|sed $'s,.*,\e[31m&\e[m,'>&2)3>&1
+colour()(color $@)
 
 # Writes a log to ~/dotfile-logs/
 # Usage: echo <message> | log [<logfile name>]
@@ -49,6 +52,15 @@ backup_remove()
     fi
 }
 
+# Symlink, but backup existing files first.
+# Usage: backup_symlink /path/from/file /path/to/file
+backup_symlink()
+{
+    backup_remove "$2"
+    mkdir -p "$(dirname "$2")"
+    ln -s "$1" "$2"
+}
+
 
 # usage: on_hotkey <command>
 # eg: on_hotkey echo hello
@@ -63,16 +75,16 @@ on_hotkey()
     # this script runs until closed with ctrl+c
     while true
     do
-        
+
         # clear any existing hotkey file
         rm -f $hotkey_file
-        
+
         # wait until a hotkey file exists
         while [ ! -e $hotkey_file ]
         do
             sleep 0.1
         done;
-        
+
         # run your command
         eval "$@"
     done
@@ -127,7 +139,7 @@ execute_on_change()
     do
         new_hash="$(find "$path" -type f | md5sum)"
         if [[ $old_hash != $new_hash ]]
-        then           
+        then
             $command
             old_hash=$new_hash
         fi
@@ -245,9 +257,49 @@ git_branch()
 {
     echo "git checkout -b $1"
     git checkout -b $1
-    
+
     echo "git push -u origin $1"
     git push -u origin $1
+}
+
+git_tagrc_push()
+{
+	git_tagrc
+	git push & git push --tags
+}
+
+git_tagrc()
+{
+	# todo: check clean
+
+	VERSION=$(git branch | grep -Po '\* release/.+' | cut -d / -f 2)
+	if [ -z "$VERSION" ]
+	then
+		echo "Error: not on a release branch."
+		return 1
+	fi
+
+	PRERELEASE=0
+	if git tag | grep -Po "v$VERSION-\d+"
+	then
+		PRERELEASE=$(git tag | grep -Po "v$VERSION-\d+" | sort | tail -n 1 | cut -d '-' -f 2)
+	fi
+	NEW_PRERELEASE=$((PRERELEASE+1))
+	NEW_VERSION="$VERSION-$NEW_PRERELEASE"
+
+	sed -i "s/\"version\":\s\"\w\.\w\.\w-*\w*\"/\"version\": \"$NEW_VERSION\"/" package.json
+	git add package.json
+	git commit -m "new release candidate: v$NEW_VERSION"
+	git tag "v$NEW_VERSION"
+	echo -e "push with:\n\n\tgit push & git push --tags\n"
+}
+
+git_bump()
+{
+  date > bump.txt &&
+  git add bump.txt &&
+  git commit -am "bump" &&
+  git push
 }
 
 # Rename a remote git branch
@@ -259,7 +311,7 @@ git_rename_remote_branch()
         echo "Rationale : Rename a branch on the server without checking it out."
         echo "Usage     : git_rename_remote_branch <remote> <old name> <new name>"
         echo "Example   : git_rename_remote_branch origin master release"
-        exit 1
+        return 1
     fi
 
     echo "Renaming $1 $2 -> $3..."
@@ -271,7 +323,7 @@ git_rename_remote_branch()
 git_repo_is_clean()
 {
     repo="$1"
-    
+
     cd "$repo"
     if [[ -n $(git status --porcelain) ]]
     then
@@ -292,8 +344,8 @@ git_delete_remote_branch()
 # Usage: git_preview_merge <branchname>
 git_preview_merge()
 {
-    branchname=1
-    git diff "...origin/$branchname"
+    branchname="$1"
+    git diff --ignore-all-space "...origin/$branchname"
 }
 
 
@@ -313,9 +365,9 @@ github_shortenurl()
     # - Warn if url looks like a commit instead of a head
     # - Warn if no /raw part on the end
     # - Output only the new URL if it worked
-    
+
     local long_url short_url code orl_arg code_arg response
-    
+
     if [ -n "$1" ]
     then
         long_url="$(echo $1 | sed 's/githubusercontent/github/g')"
@@ -323,15 +375,15 @@ github_shortenurl()
         describe_function "$FUNCNAME"
         return 1
     fi
-    
+
     if [ -n "$2" ]
     then
         curl -o- -i -s http://git.io -F "url=$long_url" -F "code=$2"
     else
         curl -o- -i -s http://git.io -F "url=$long_url"
     fi
-    
-    echo 
+
+    echo
 }
 
 # Set the terminal title
@@ -352,6 +404,13 @@ github_clone()
 bitbucket_clone()
 {
     git clone git@bitbucket.com:/$1.git
+}
+
+# Clone from gitlab
+# Usage: gitlab_clone username/repo
+gitlab_clone()
+{
+    git clone git@gitlab.com:/$1.git
 }
 
 
@@ -383,7 +442,7 @@ copy_last_command()
 # View active network connections
 view_network()
 {
-    lsof -i
+    sudo lsof -i
 }
 
 # Displays a hash of a directory recursively
@@ -442,9 +501,9 @@ colour_percentage()
     g="\e[0;32m";
     y="\e[0;33m";
     r="\e[0;31m";
-    
-    if   [ "$1" -lt "71" ]; then echo -en "$g$1%$w"; 
-    elif [ "$1" -gt "80" ]; then echo -en "$r$1%$w"; 
+
+    if   [ "$1" -lt "71" ]; then echo -en "$g$1%$w";
+    elif [ "$1" -gt "80" ]; then echo -en "$r$1%$w";
     else                         echo -en "$y$1%$w"; fi
 }
 
@@ -466,7 +525,7 @@ describe_function()
 
     # tmp hax
     function_name="$(echo $function_name | sed 's/dotfiles_/dotfiles /g')"
-            
+
     echo -en "\n\t$function_name\n"
 
     let "line_number-=1"
@@ -502,13 +561,14 @@ describe_functions()
 # Adds a keypair if one does not exist.
 # Echo's out the public key in the format expected by add_remote_user (username, fullname, pubkey)
 #
-# Usage: 
+# Usage:
 #
 #    request_remote_user
-#    
+#
 request_remote_user()
 {
     USERNAME="$USER"
+    # todo: grep -e "^${USER}:" (because what if your usename is "d")
     FULLNAME="$(getent passwd | grep $USER | cut -d':' -f5 | cut -d',' -f1)"
 
     if [ ! -e ~/.ssh/id_rsa.pub ]
@@ -527,13 +587,14 @@ request_remote_user()
 
 # Adds a new user to the system, allowing access by the provided public key.
 #
-# Usage: 
+# Usage:
 #
 #    add_remote_user "<username>" "<Full Name>" "<Public Key>"
 #
 # eg:
 #
 #    add_remote_user "dean" "Dean Rather" "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQChab0m+uBRifnBEn8DGFc0rUWDtuMB93Z5lM9yKxO0SHN0e4Fhozv83LRxGThoWDl6jEFjaW2RqqbtSgCJQBnJrQDdKxeLgkLOz6FEWnQsvRsT71ngLSXUEKWhIfJS1D+Cur6q7CmiaZf86Yh3T2bsaqS2x0aWtWTd6ybLpqFATdEQrzJH1SYOGNe3uRx/hR9d3D3v20Azm2bhaQ4EteSdf11dGcRdmE4oQNPZXHLPtpZQMVpKbpNuuUMwddh/TPnnRq7WSU7ZAKDHPxPvlQRvqlq6xU0L8vl2pGvJhnJHg9ZZWZRcAMnLwu+Zh0vMtpOFnT4SUXlyWqqwjA1c9c9x dean@dean-XPS-8700"
+#    add_remote_user d "Dean Rather" "$(wget -q -O - deanrather.com/pubkeys.txt)"
 #
 add_remote_user()
 {
@@ -541,21 +602,22 @@ add_remote_user()
     FULLNAME="$2"
     PUBKEY="$3"
 
-    sudo adduser --disabled-password "$USERNAME" --gecos="$FULLNAME"
+	sudo adduser --quiet --disabled-password "$USERNAME" --gecos="$FULLNAME"
     sudo mkdir "/home/$USERNAME/.ssh"
-    sudo chown "$USERNAME:$USERNAME" "/home/$USERNAME/.ssh/"
     echo -n "Adding public key "
     echo "$PUBKEY" | sudo tee "/home/$USERNAME/.ssh/authorized_keys"
-    sudo chown "$USERNAME:$USERNAME" "/home/$USERNAME/.ssh/authorized_keys"
+    sudo chown -R "$USERNAME:$USERNAME" "/home/$USERNAME/.ssh/"
+
+    grant_user_superpowers "$USERNAME"
 
     IPS="$(ifconfig | grep -Po 'inet addr:.+? ' | grep -v '127.0.0.1' | cut -d":" -f2)"
-    echo "$FULLNAME can now access your machine as the user $USERNAME via of the following IPs:"
+    echo -e "\n\n$FULLNAME can now access this machine as the user $USERNAME via one of the following IPs:"
     echo "$IPS"
+    wget -q -O - icanhazip.com
 
     # TODO:
     # - Add validation for inputs
     # - Add error handling
-    # - check sudo perms
 }
 
 
@@ -574,13 +636,42 @@ set_hostname()
 # eg: grant_user_superpowers dean
 grant_user_superpowers()
 {
-    user="$1"
-    echo "$user ALL=(ALL) NOPASSWD: ALL" | sudo tee "/etc/sudoers.d/$user-sudo-nopasswd"
+    USERNAME="$1"
+    echo "$USERNAME ALL=(ALL) NOPASSWD: ALL" | sudo tee "/etc/sudoers.d/$USERNAME-sudo-nopasswd"
+	sudo chmod 0440 "/etc/sudoers.d/$USERNAME-sudo-nopasswd"
 }
+
+
+
+install_tmux_2()
+{
+	if ! tmux -V | grep 'tmux 2.0'
+	then
+		sudo apt-get update
+		sudo apt-get install -y python-software-properties software-properties-common
+		sudo add-apt-repository -y ppa:pi-rho/dev
+		sudo apt-get update
+		sudo apt-get install -y tmux
+	fi
+	echo "Current Tmux Version: $(tmux -V)"
+}
+
+
+install_powerline_fonts()
+{
+	cd /tmp
+	wget https://github.com/Lokaltog/powerline/raw/develop/font/PowerlineSymbols.otf https://github.com/Lokaltog/powerline/raw/develop/font/10-powerline-symbols.conf
+	mkdir -p ~/.fonts/
+	mv PowerlineSymbols.otf ~/.fonts/
+	fc-cache -vf ~/.fonts
+	mkdir -p ~/.config/fontconfig/conf.d/
+	mv 10-powerline-symbols.conf ~/.config/fontconfig/conf.d/
+}
+
+# ---------------------------------
 
 # Get list of misc functions defined
 [[ "$misc_function_list" ]] ||
     misc_function_list=$(grep -Fxv -f \
         <(echo "$original_function_list") \
         <(compgen -A function))
-
