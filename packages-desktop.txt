@@ -6,3 +6,5 @@ terminator
 wireshark
 xclip
 xdotool
+arp-scan
+meld
